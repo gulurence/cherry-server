@@ -1,0 +1,18 @@
+# Visual Studio / MSBuild 构建产物
+.vs/
+x64/
+Debug/
+Release/
+*.user
+*.suo
+*.obj
+*.pch
+*.res
+*.ilk
+*.idb
+*.iobj
+*.ipdb
+*.pdb
+*.tlog
+*.recipe
+*.lastbuildstate

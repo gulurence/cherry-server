@@ -12,6 +12,10 @@ const (
 	AccountPasswordError  int32 = 203 // 账号不存在或密码错误
 	AccountNotLogin       int32 = 204 // 账号未登录
 	AccountDuplicateLogin int32 = 205 // 账号重复登录(顶号)
+
+	InvalidFaction int32 = 210 // 非法阵营
+	TargetBlocked  int32 = 211 // 目标不可达或被阻挡
+	NotEntered     int32 = 212 // 尚未进入世界
 )
 
 // IsOK 返回 code 是否为成功(0)。

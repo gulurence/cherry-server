@@ -39,3 +39,72 @@ type WorldInfo struct {
 type PlayerInfo struct {
 	UID int64 `json:"uid"`
 }
+
+// Cell 世界格子坐标。
+type Cell struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+}
+
+// WorldObject 世界对象（objEnter 推送与进入世界快照的元素）。
+type WorldObject struct {
+	ID      int64   `json:"id"`
+	Kind    int32   `json:"kind"`    // 0=NPC, 1=玩家
+	Faction int32   `json:"faction"` // 0红 1黑 2绿
+	X       float32 `json:"x"`
+	Y       float32 `json:"y"`
+	CellX   int32   `json:"cell_x"`
+	CellY   int32   `json:"cell_y"`
+}
+
+// EnterRequest 进入世界请求（携带所选阵营）。
+type EnterRequest struct {
+	Faction int32 `json:"faction"`
+}
+
+// EnterResponse 进入世界响应：地图 + 出生点 + 初始可见对象快照。
+type EnterResponse struct {
+	Map     string        `json:"map"`     // 1,000,000 个字符 '0'/'1'/'2'
+	SelfID  int64         `json:"self_id"` // 自己的对象 id
+	SpawnX  int32         `json:"spawn_x"`
+	SpawnY  int32         `json:"spawn_y"`
+	Faction int32         `json:"faction"`
+	Objects []WorldObject `json:"objects"`
+}
+
+// MoveToRequest 移动到目标格子。
+type MoveToRequest struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+}
+
+// MoveToResponse 移动请求响应（含 A* 路径）。
+type MoveToResponse struct {
+	Code int32  `json:"code"` // 0 成功
+	Path []Cell `json:"path"`
+}
+
+// ViewRequest 上报视野中心（客户端当前显示中心）。
+type ViewRequest struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+}
+
+// ViewResponse 视野上报响应。
+type ViewResponse struct {
+	Code int32 `json:"code"`
+}
+
+// ObjMovePush 对象移动推送。
+type ObjMovePush struct {
+	ID    int64   `json:"id"`
+	X     float32 `json:"x"`
+	Y     float32 `json:"y"`
+	CellX int32   `json:"cell_x"`
+	CellY int32   `json:"cell_y"`
+}
+
+// ObjLeavePush 对象离开视野推送。
+type ObjLeavePush struct {
+	ID int64 `json:"id"`
+}
