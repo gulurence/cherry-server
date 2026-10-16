@@ -1,9 +1,9 @@
 package cherryActor
 
 import (
-	creflect "github.com/cherry-game/cherry/extend/reflect"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
+	creflect "github.com/gulurence/cherry-server/extend/reflect"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 type mailbox struct {

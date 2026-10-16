@@ -14,11 +14,11 @@ package cherryProfile
 import (
 	"path/filepath"
 
-	cerror "github.com/cherry-game/cherry/error"
-	cfile "github.com/cherry-game/cherry/extend/file"
-	cjson "github.com/cherry-game/cherry/extend/json"
-	cstring "github.com/cherry-game/cherry/extend/string"
-	cfacade "github.com/cherry-game/cherry/facade"
+	cerror "github.com/gulurence/cherry-server/error"
+	cfile "github.com/gulurence/cherry-server/extend/file"
+	cjson "github.com/gulurence/cherry-server/extend/json"
+	cstring "github.com/gulurence/cherry-server/extend/string"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 // cfg is the package-level global config singleton.

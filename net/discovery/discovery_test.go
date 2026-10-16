@@ -3,7 +3,7 @@ package cherryDiscovery
 import (
 	"testing"
 
-	cfacade "github.com/cherry-game/cherry/facade"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 // testDiscoveryComponent is a minimal IDiscoveryComponent for testing Register/GetDiscovery.

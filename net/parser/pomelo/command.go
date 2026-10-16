@@ -3,10 +3,10 @@ package pomelo
 import (
 	"time"
 
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	pmessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
-	ppacket "github.com/cherry-game/cherry/net/parser/pomelo/packet"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	pmessage "github.com/gulurence/cherry-server/net/parser/pomelo/message"
+	ppacket "github.com/gulurence/cherry-server/net/parser/pomelo/packet"
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap/zapcore"
 )

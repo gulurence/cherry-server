@@ -6,14 +6,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	cnet "github.com/cherry-game/cherry/extend/net"
-	ctime "github.com/cherry-game/cherry/extend/time"
-	cutils "github.com/cherry-game/cherry/extend/utils"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	pomeloMessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
-	pomeloPacket "github.com/cherry-game/cherry/net/parser/pomelo/packet"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cnet "github.com/gulurence/cherry-server/extend/net"
+	ctime "github.com/gulurence/cherry-server/extend/time"
+	cutils "github.com/gulurence/cherry-server/extend/utils"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	pomeloMessage "github.com/gulurence/cherry-server/net/parser/pomelo/message"
+	pomeloPacket "github.com/gulurence/cherry-server/net/parser/pomelo/packet"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 	"go.uber.org/zap/zapcore"
 )
 

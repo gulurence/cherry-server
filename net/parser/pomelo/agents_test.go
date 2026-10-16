@@ -3,8 +3,8 @@ package pomelo
 import (
 	"testing"
 
-	cfacade "github.com/cherry-game/cherry/facade"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 func newTestAgent(sid string) *Agent {

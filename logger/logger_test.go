@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	ctime "github.com/cherry-game/cherry/extend/time"
+	ctime "github.com/gulurence/cherry-server/extend/time"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

@@ -849,7 +849,7 @@ const file_proto_proto_rawDesc = "" +
 	"\bPushType\x12\n" +
 	"\n" +
 	"\x06AllUID\x10\x00\x12\a\n" +
-	"\x03UID\x10\x01B;Z9github.com/cherry-game/cherry/net/proto/proto;cherryProtob\x06proto3"
+	"\x03UID\x10\x01B;Z9github.com/gulurence/cherry-server/net/proto/proto;cherryProtob\x06proto3"
 
 var (
 	file_proto_proto_rawDescOnce sync.Once

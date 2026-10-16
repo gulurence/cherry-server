@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	cerr "github.com/cherry-game/cherry/error"
-	cslice "github.com/cherry-game/cherry/extend/slice"
+	cerr "github.com/gulurence/cherry-server/error"
+	cslice "github.com/gulurence/cherry-server/extend/slice"
 )
 
 func JudgeFile(filePath string) (string, bool) {

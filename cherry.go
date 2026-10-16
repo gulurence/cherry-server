@@ -1,10 +1,10 @@
 package cherry
 
 import (
-	cfacade "github.com/cherry-game/cherry/facade"
-	ccluster "github.com/cherry-game/cherry/net/cluster"
-	cdiscovery "github.com/cherry-game/cherry/net/discovery"
-	cherryDiscovery "github.com/cherry-game/cherry/net/discovery"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	ccluster "github.com/gulurence/cherry-server/net/cluster"
+	cdiscovery "github.com/gulurence/cherry-server/net/discovery"
+	cherryDiscovery "github.com/gulurence/cherry-server/net/discovery"
 )
 
 type (

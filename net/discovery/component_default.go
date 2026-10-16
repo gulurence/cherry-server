@@ -4,12 +4,12 @@ import (
 	"math/rand"
 	"sync"
 
-	cerr "github.com/cherry-game/cherry/error"
-	cslice "github.com/cherry-game/cherry/extend/slice"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	cproto "github.com/cherry-game/cherry/net/proto"
-	cprofile "github.com/cherry-game/cherry/profile"
+	cerr "github.com/gulurence/cherry-server/error"
+	cslice "github.com/gulurence/cherry-server/extend/slice"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	cproto "github.com/gulurence/cherry-server/net/proto"
+	cprofile "github.com/gulurence/cherry-server/profile"
 )
 
 // Config keys used to parse node information from the profile file.

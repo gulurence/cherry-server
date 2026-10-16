@@ -1,7 +1,7 @@
 package cherryTime
 
 import (
-	cstring "github.com/cherry-game/cherry/extend/string"
+	cstring "github.com/gulurence/cherry-server/extend/string"
 )
 
 // ToSecond 输出秒级时间戳

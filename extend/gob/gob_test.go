@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 func TestPB(t *testing.T) {

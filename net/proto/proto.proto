@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/cherry-game/cherry/net/proto/proto;cherryProto";
+option go_package = "github.com/gulurence/cherry-server/net/proto/proto;cherryProto";
 
 package cherryProto;
 

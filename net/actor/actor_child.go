@@ -4,8 +4,8 @@ import (
 	"strings"
 	"sync"
 
-	cherryCode "github.com/cherry-game/cherry/code"
-	cfacade "github.com/cherry-game/cherry/facade"
+	cherryCode "github.com/gulurence/cherry-server/code"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 type actorChild struct {

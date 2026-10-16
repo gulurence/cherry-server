@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	clog "github.com/cherry-game/cherry/logger"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 var (

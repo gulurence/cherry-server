@@ -3,7 +3,7 @@ package cherryProto
 import (
 	"sync"
 
-	ctime "github.com/cherry-game/cherry/extend/time"
+	ctime "github.com/gulurence/cherry-server/extend/time"
 )
 
 var (

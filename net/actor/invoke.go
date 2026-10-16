@@ -5,13 +5,13 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	ccode "github.com/cherry-game/cherry/code"
-	cerror "github.com/cherry-game/cherry/error"
-	creflect "github.com/cherry-game/cherry/extend/reflect"
-	cutils "github.com/cherry-game/cherry/extend/utils"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	ccode "github.com/gulurence/cherry-server/code"
+	cerror "github.com/gulurence/cherry-server/error"
+	creflect "github.com/gulurence/cherry-server/extend/reflect"
+	cutils "github.com/gulurence/cherry-server/extend/utils"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 func InvokeLocalFunc(app cfacade.IApplication, fi *creflect.FuncInfo, m *cfacade.Message) {

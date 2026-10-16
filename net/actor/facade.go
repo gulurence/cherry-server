@@ -3,8 +3,8 @@ package cherryActor
 import (
 	"time"
 
-	creflect "github.com/cherry-game/cherry/extend/reflect"
-	cfacade "github.com/cherry-game/cherry/facade"
+	creflect "github.com/gulurence/cherry-server/extend/reflect"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 type (

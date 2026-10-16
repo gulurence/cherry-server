@@ -1,9 +1,9 @@
 package pomelo
 
 import (
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	pmessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	pmessage "github.com/gulurence/cherry-server/net/parser/pomelo/message"
 )
 
 // DefaultDataRoute default message route handler

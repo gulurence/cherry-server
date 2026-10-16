@@ -48,8 +48,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	cutils "github.com/cherry-game/cherry/extend/utils"
-	clog "github.com/cherry-game/cherry/logger"
+	cutils "github.com/gulurence/cherry-server/extend/utils"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 // 5-level timer wheel geometry

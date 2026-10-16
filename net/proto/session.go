@@ -1,8 +1,8 @@
 package cherryProto
 
 import (
-	cconst "github.com/cherry-game/cherry/const"
-	cstring "github.com/cherry-game/cherry/extend/string"
+	cconst "github.com/gulurence/cherry-server/const"
+	cstring "github.com/gulurence/cherry-server/extend/string"
 )
 
 func (x *Session) IsBind() bool {

@@ -14,7 +14,7 @@
 ## 📦 安装
 
 ```bash
-go get github.com/cherry-game/cherry
+go get github.com/gulurence/cherry-server
 ```
 
 需要 Go 1.24+。
@@ -25,7 +25,7 @@ go get github.com/cherry-game/cherry
 package main
 
 import (
-    cherry "github.com/cherry-game/cherry"
+    cherry "github.com/gulurence/cherry-server"
 )
 
 func main() {

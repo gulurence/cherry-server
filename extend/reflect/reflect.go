@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"runtime"
 
-	cstring "github.com/cherry-game/cherry/extend/string"
+	cstring "github.com/gulurence/cherry-server/extend/string"
 )
 
 func ReflectTry(f reflect.Value, args []reflect.Value, handler func(interface{})) {

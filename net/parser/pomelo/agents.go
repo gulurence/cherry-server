@@ -3,9 +3,9 @@ package pomelo
 import (
 	"sync"
 
-	cerr "github.com/cherry-game/cherry/error"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
+	cerr "github.com/gulurence/cherry-server/error"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 var (

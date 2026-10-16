@@ -3,8 +3,8 @@ package cherryNats
 import (
 	"time"
 
-	cerror "github.com/cherry-game/cherry/error"
-	cfacade "github.com/cherry-game/cherry/facade"
+	cerror "github.com/gulurence/cherry-server/error"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 // NewConnectFromConfig builds a *Connect from the cluster.nats config section.

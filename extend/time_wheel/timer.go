@@ -3,7 +3,7 @@ package cherryTimeWheel
 import (
 	"time"
 
-	clog "github.com/cherry-game/cherry/logger"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 // Timer is a user-facing handle with Start/Stop/Clear.

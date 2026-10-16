@@ -10,10 +10,10 @@
 package cherryDiscovery
 
 import (
-	cerror "github.com/cherry-game/cherry/error"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	cprofile "github.com/cherry-game/cherry/profile"
+	cerror "github.com/gulurence/cherry-server/error"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	cprofile "github.com/gulurence/cherry-server/profile"
 )
 
 // discoveryMap holds all registered discovery component constructors, keyed by mode name.

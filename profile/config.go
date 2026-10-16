@@ -3,7 +3,7 @@ package cherryProfile
 import (
 	"time"
 
-	cfacade "github.com/cherry-game/cherry/facade"
+	cfacade "github.com/gulurence/cherry-server/facade"
 	jsoniter "github.com/json-iterator/go"
 )
 

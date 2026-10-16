@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	cherryNet "github.com/cherry-game/cherry/extend/net"
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
+	cherryNet "github.com/gulurence/cherry-server/extend/net"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
 	"github.com/gorilla/websocket"
 )
 

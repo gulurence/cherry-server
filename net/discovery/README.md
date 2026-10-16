@@ -20,7 +20,7 @@ IDiscovery (业务接口)
 ## Install
 
 ```go
-import cherryDiscovery "github.com/cherry-game/cherry/net/discovery"
+import cherryDiscovery "github.com/gulurence/cherry-server/net/discovery"
 ```
 
 ## Quick Start

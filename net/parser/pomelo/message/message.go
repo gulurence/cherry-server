@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	cerr "github.com/cherry-game/cherry/error"
-	ccompress "github.com/cherry-game/cherry/extend/compress"
+	cerr "github.com/gulurence/cherry-server/error"
+	ccompress "github.com/gulurence/cherry-server/extend/compress"
 )
 
 var (

@@ -3,7 +3,7 @@ package cherryLogger
 import (
 	"strings"
 
-	cfacade "github.com/cherry-game/cherry/facade"
+	cfacade "github.com/gulurence/cherry-server/facade"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

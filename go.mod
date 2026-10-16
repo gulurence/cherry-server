@@ -1,4 +1,4 @@
-module github.com/cherry-game/cherry
+module github.com/gulurence/cherry-server
 
 go 1.24.0
 

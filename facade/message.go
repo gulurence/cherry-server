@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cconst "github.com/cherry-game/cherry/const"
-	cerr "github.com/cherry-game/cherry/error"
-	cstring "github.com/cherry-game/cherry/extend/string"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cconst "github.com/gulurence/cherry-server/const"
+	cerr "github.com/gulurence/cherry-server/error"
+	cstring "github.com/gulurence/cherry-server/extend/string"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -3,7 +3,7 @@ package pomeloClient
 import (
 	"time"
 
-	cmsg "github.com/cherry-game/cherry/net/parser/pomelo/message"
+	cmsg "github.com/gulurence/cherry-server/net/parser/pomelo/message"
 )
 
 // RequestContext carries the timeout ticker and response channel for a pending request.

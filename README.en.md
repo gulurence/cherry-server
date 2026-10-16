@@ -13,7 +13,7 @@ Built with Go + Actor Model, Cherry is designed for high performance and scalabi
 ## 📦 Install
 
 ```bash
-go get github.com/cherry-game/cherry
+go get github.com/gulurence/cherry-server
 ```
 
 Requires Go 1.24+.
@@ -24,7 +24,7 @@ Requires Go 1.24+.
 package main
 
 import (
-    cherry "github.com/cherry-game/cherry"
+    cherry "github.com/gulurence/cherry-server"
 )
 
 func main() {

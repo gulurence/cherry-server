@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	cfacade "github.com/cherry-game/cherry/facade"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 func newTestMember(nodeID, nodeType, address string) *cproto.Member {

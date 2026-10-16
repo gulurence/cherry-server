@@ -3,9 +3,9 @@ package cherryDiscovery
 import (
 	"testing"
 
-	ctime "github.com/cherry-game/cherry/extend/time"
-	cnats "github.com/cherry-game/cherry/net/nats"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	ctime "github.com/gulurence/cherry-server/extend/time"
+	cnats "github.com/gulurence/cherry-server/net/nats"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 // newTestMaster creates a ComponentMaster with a mock app pre-configured

@@ -1,0 +1,59 @@
+{
+  "env": "lg",
+  "debug": true,
+  "print_level": "debug",
+  "cluster": {
+    "discovery": {
+      "mode": "nats"
+    },
+    "nats": {
+      "master_node_id": "lg-master",
+      "address": "nats://127.0.0.1:4222",
+      "prefix": "node",
+      "reconnect_delay": 1,
+      "max_reconnects": 0,
+      "request_timeout": 2,
+      "user": "",
+      "password": ""
+    }
+  },
+  "node": {
+    "master": [
+      {
+        "node_id": "lg-master",
+        "address": "",
+        "__settings__": {},
+        "enabled": true
+      }
+    ],
+    "login": [
+      {
+        "node_id": "^lg-login-\\d+$",
+        "address": "",
+        "__settings__": {
+          "token_secret": "cherry-login-secret"
+        },
+        "enabled": true
+      }
+    ],
+    "gate": [
+      {
+        "node_id": "^lg-gate-\\d+$",
+        "address": ":20010",
+        "__settings__": {
+          "tcp_address": ":20011",
+          "token_secret": "cherry-login-secret"
+        },
+        "enabled": true
+      }
+    ],
+    "game": [
+      {
+        "node_id": "^lg-game-\\d+$",
+        "address": "",
+        "__settings__": {},
+        "enabled": true
+      }
+    ]
+  }
+}

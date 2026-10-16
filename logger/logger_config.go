@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	cfacade "github.com/cherry-game/cherry/facade"
-	cprofile "github.com/cherry-game/cherry/profile"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	cprofile "github.com/gulurence/cherry-server/profile"
 	"go.uber.org/zap/zapcore"
 )
 

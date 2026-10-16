@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	cstring "github.com/cherry-game/cherry/extend/string"
-	cutils "github.com/cherry-game/cherry/extend/utils"
+	cstring "github.com/gulurence/cherry-server/extend/string"
+	cutils "github.com/gulurence/cherry-server/extend/utils"
 )
 
 func Int32In(v int32, sl []int32) (int, bool) {

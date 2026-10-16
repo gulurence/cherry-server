@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	cerror "github.com/cherry-game/cherry/error"
+	cerror "github.com/gulurence/cherry-server/error"
 	"github.com/lestrrat-go/strftime"
 )
 

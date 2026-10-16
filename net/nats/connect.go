@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	cerror "github.com/cherry-game/cherry/error"
-	clog "github.com/cherry-game/cherry/logger"
+	cerror "github.com/gulurence/cherry-server/error"
+	clog "github.com/gulurence/cherry-server/logger"
 	"github.com/nats-io/nats.go"
 )
 

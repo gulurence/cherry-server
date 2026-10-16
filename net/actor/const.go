@@ -1,7 +1,7 @@
 package cherryActor
 
 import (
-	cerror "github.com/cherry-game/cherry/error"
+	cerror "github.com/gulurence/cherry-server/error"
 )
 
 var (

@@ -1,7 +1,7 @@
 // Package cherrySync cherrySync file from https://github.com/beego/beego/blob/develop/core/utils/safemap.go
 package cherrySync
 
-import cerr "github.com/cherry-game/cherry/error"
+import cerr "github.com/gulurence/cherry-server/error"
 
 var (
 	// errReturn indicates that the more than borrowed elements were returned.

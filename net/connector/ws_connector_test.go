@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	clog "github.com/cherry-game/cherry/logger"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 // websocket client http://www.websocket-test.com/

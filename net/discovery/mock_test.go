@@ -3,7 +3,7 @@ package cherryDiscovery
 import (
 	"google.golang.org/protobuf/proto"
 
-	cfacade "github.com/cherry-game/cherry/facade"
+	cfacade "github.com/gulurence/cherry-server/facade"
 )
 
 // mockSerializer implements cfacade.ISerializer using protobuf marshal/unmarshal.

@@ -1,10 +1,10 @@
 package simple
 
 import (
-	cfacade "github.com/cherry-game/cherry/facade"
-	clog "github.com/cherry-game/cherry/logger"
-	cactor "github.com/cherry-game/cherry/net/actor"
-	cproto "github.com/cherry-game/cherry/net/proto"
+	cfacade "github.com/gulurence/cherry-server/facade"
+	clog "github.com/gulurence/cherry-server/logger"
+	cactor "github.com/gulurence/cherry-server/net/actor"
+	cproto "github.com/gulurence/cherry-server/net/proto"
 )
 
 // ActorBase provides convenience methods for actors to respond to clients.

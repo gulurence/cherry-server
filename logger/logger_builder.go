@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cherry-game/cherry/logger/rotatelogs"
+	"github.com/gulurence/cherry-server/logger/rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

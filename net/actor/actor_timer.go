@@ -3,8 +3,8 @@ package cherryActor
 import (
 	"time"
 
-	ctimeWheel "github.com/cherry-game/cherry/extend/time_wheel"
-	clog "github.com/cherry-game/cherry/logger"
+	ctimeWheel "github.com/gulurence/cherry-server/extend/time_wheel"
+	clog "github.com/gulurence/cherry-server/logger"
 )
 
 type (
