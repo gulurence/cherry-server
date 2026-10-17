@@ -1,3 +1,26 @@
+// 本文件是 game 节点上的世界模拟 actor（actorID = "worldsim"），承载完整的
+// 实时网格世界：随机地图、600 个 NPC 游走、阵营碰撞、灯塔（AOI）视野、周期
+// tick，以及面向客户端的全部推送。协议层 ActorWorld 通过 Call/CallWait 调用本
+// 文件注册的远程函数，两者各自运行在自己的 goroutine 上，所有模拟逻辑串行跑在
+// 本 actor 的 goroutine 内（p.Timer().Add 驱动，无并发）。
+//
+// 代码框架（自上而下）：
+//
+//   1. 包级常量：tickInterval(50ms) / npcPerFaction(200) / playerIdleWait(60s)
+//   2. RPC 参数类型：simEnterArg / simMoveToArg / simViewArg / simLeaveArg
+//      （仅同一 game 节点内以 Go 对象传递，不经过线上序列化）
+//   3. playerEntry：记录已进入世界的玩家（uid / agentPath / 阵营 / 对象 id / 视野中心 / 最后活跃）
+//   4. ActorWorldSim 结构体：sim(纯逻辑世界) / mapStr(下发地图) / rng / nextObjID /
+//      players / objOwner / aoi(灯塔) / lastTick / collStats(碰撞统计)
+//   5. 生命周期：AliasID() -> OnInit()（生成地图、注册远程函数、注入回调、启动 tick）
+//   6. 世界初始化：spawnNPCs()（红/黑/绿各 200 个，随机尺寸 1~3）、randomWalkable()
+//   7. 远程函数（被 ActorWorld 调用）：enter / moveTo / view / leave
+//   8. 每帧模拟：tick() -> sim.Update + WanderNPCs + syncAOI + reportCollisions + sweepIdle
+//      syncAOI()（对象换格/换塔扇出事件）、sweepIdle()（清理超时玩家）、removePlayer()
+//   9. 碰撞回调：onCollision()（统计阵营关系）、reportCollisions()（每秒汇总一次日志）
+//  10. 寻路回调：onPathChanged() / buildObjPath()（广播剩余路点 + 寻路耗时，供客户端画线）
+//  11. 工具函数：clampCell / buildWorldObject / buildObjMove / snapshotInTowers /
+//      towerUids / pushToUIDs / pushObjEnterExcept / pushObjMoveToTower / pushObjTowerChange
 package game
 
 import (
