@@ -23,7 +23,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Dynamic</UseOfMfc>
+    <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -31,7 +31,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Dynamic</UseOfMfc>
+    <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -92,6 +92,7 @@
   <ItemGroup>
     <ClCompile Include="GridWorldClient.cpp" />
     <ClCompile Include="Json.cpp" />
+    <ClCompile Include="LoginDlg.cpp" />
     <ClCompile Include="MainDlg.cpp" />
     <ClCompile Include="PomeloClient.cpp" />
     <ClCompile Include="WorldView.cpp" />
@@ -102,6 +103,7 @@
   <ItemGroup>
     <ClInclude Include="GridWorldClient.h" />
     <ClInclude Include="Json.h" />
+    <ClInclude Include="LoginDlg.h" />
     <ClInclude Include="MainDlg.h" />
     <ClInclude Include="PomeloClient.h" />
     <ClInclude Include="WorldView.h" />

@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// MaxWanderExpand 限制 NPC 游走单次 A* 的展开节点数：对“被河流/山隔断的
+// 目标”不会再展开整个连通域，而是尽早判定不可达，避免 3000 个 NPC 时卡顿。
+const MaxWanderExpand = 30000
+
 // repathReq 是一次延迟重寻路请求。
 type repathReq struct {
 	Obj    *Object
@@ -19,12 +23,15 @@ type Game struct {
 	hash *SpatialHash
 	objs map[int]*Object
 	rng  *rand.Rand
+	pf   *Pathfinder
 
 	lastCollision map[uint64]time.Time
 	repathQueue   []repathReq
 
 	// OnCollision 在发生碰撞时回调（阵营关系已判定）。由上层注入日志等。
 	OnCollision func(a, b *Object, rel Relation)
+	// OnPathChanged 在对象获得新路径时回调（含寻路耗时）。由上层注入路径推送。
+	OnPathChanged func(o *Object)
 }
 
 // NewGame 创建一个绑定到 grid 的模拟世界。
@@ -34,6 +41,7 @@ func NewGame(grid *Grid, rng *rand.Rand) *Game {
 		hash:          NewSpatialHash(),
 		objs:          make(map[int]*Object),
 		rng:           rng,
+		pf:            NewPathfinder(),
 		lastCollision: make(map[uint64]time.Time),
 	}
 }
@@ -63,7 +71,14 @@ func (g *Game) Objects() []*Object {
 // AddObject 在对象当前位置放置它（不自动寻路）。
 func (g *Game) AddObject(o *Object) {
 	if o.Radius <= 0 {
-		o.Radius = 0.4
+		if o.Size > 0 {
+			o.Radius = RadiusForSize(o.Size)
+		} else {
+			o.Radius = 0.4
+		}
+	}
+	if o.Speed <= 0 {
+		o.Speed = MoveSpeed
 	}
 	o.Cell = Vec2i{int(o.Pos.X), int(o.Pos.Y)}
 	o.State = StateMoving
@@ -84,7 +99,9 @@ func (g *Game) RemoveObject(id int) {
 // SetPath 为对象设定一条到 target 的路径，返回该路径（nil 表示不可达）。
 // 会清空旧路径并重置到 StateMoving。
 func (g *Game) SetPath(o *Object, target Vec2i) []Vec2i {
+	start := time.Now()
 	path := AStar(g.grid, o.Cell, target)
+	o.PathCostMs = time.Since(start).Milliseconds()
 	if path == nil {
 		return nil
 	}
@@ -93,6 +110,28 @@ func (g *Game) SetPath(o *Object, target Vec2i) []Vec2i {
 	o.Target = target
 	o.State = StateMoving
 	o.RequestRepath = false
+	if g.OnPathChanged != nil {
+		g.OnPathChanged(o)
+	}
+	return path
+}
+
+// SetPathLimited 与 SetPath 相同，但用有节点上限的 A*（见 MaxWanderExpand）。
+func (g *Game) SetPathLimited(o *Object, target Vec2i, maxExpand int) []Vec2i {
+	start := time.Now()
+	path := g.pf.Find(g.grid, o.Cell, target, maxExpand)
+	o.PathCostMs = time.Since(start).Milliseconds()
+	if path == nil {
+		return nil
+	}
+	o.Path = path
+	o.PathIdx = 0
+	o.Target = target
+	o.State = StateMoving
+	o.RequestRepath = false
+	if g.OnPathChanged != nil {
+		g.OnPathChanged(o)
+	}
 	return path
 }
 
@@ -105,8 +144,7 @@ func (g *Game) AssignRandomTarget(o *Object) {
 		tx := o.Cell.X + g.rng.Intn(sampleRange*2+1) - sampleRange
 		ty := o.Cell.Y + g.rng.Intn(sampleRange*2+1) - sampleRange
 		t := Vec2i{tx, ty}
-		if g.grid.Walkable(t) {
-			g.SetPath(o, t)
+		if g.grid.Walkable(t) && g.SetPathLimited(o, t, MaxWanderExpand) != nil {
 			return
 		}
 	}
@@ -169,10 +207,15 @@ func (g *Game) runPathBudget(d time.Duration) {
 	for len(g.repathQueue) > 0 && time.Now().Before(deadline) {
 		req := g.repathQueue[0]
 		g.repathQueue = g.repathQueue[1:]
-		path := AStar(g.grid, req.Obj.Cell, req.Target)
+		start := time.Now()
+		path := g.pf.Find(g.grid, req.Obj.Cell, req.Target, MaxWanderExpand)
+		req.Obj.PathCostMs = time.Since(start).Milliseconds()
 		if len(path) > 0 {
 			req.Obj.Path = path
 			req.Obj.PathIdx = 0
+			if g.OnPathChanged != nil {
+				g.OnPathChanged(req.Obj)
+			}
 		}
 	}
 }
@@ -271,7 +314,9 @@ func (g *Game) detectDeadlock(now time.Time) {
 }
 
 // WanderNPCs 为到达目的地 / 空闲的 NPC 随机挑选新目标并寻路。
-func (g *Game) WanderNPCs() {
+// 每个 NPC 受 WanderCooldown 节流：未到时间则跳过，避免大量 NPC 在同一帧
+// 同时触发 A*（尤其是一直找不到可达目标的 NPC，会退化成每帧一次重寻路）。
+func (g *Game) WanderNPCs(now time.Time) {
 	for _, o := range g.objs {
 		if o.IsPlayer {
 			continue
@@ -279,6 +324,10 @@ func (g *Game) WanderNPCs() {
 		if o.State != StateMoving || o.PathIdx < len(o.Path) {
 			continue
 		}
+		if now.Before(o.WanderAt) {
+			continue
+		}
+		o.WanderAt = now.Add(WanderCooldown)
 		g.AssignRandomTarget(o)
 	}
 }

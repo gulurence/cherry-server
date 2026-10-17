@@ -20,11 +20,15 @@ type GridMap struct {
 // GenerateMap 随机生成一张 1000×1000 地图：
 //   - 山：若干随机簇（中心 + 抖动圆盘）
 //   - 河：若干条带随机漂移的带状曲线
+//   - 阻挡（山/河）至少占全图 1/3，不足则随机补山
 //
 // 其余格子可通行。返回的 MapString 是 1,000,000 个字符的 '0'/'1'/'2' 串。
 func GenerateMap(rng *rand.Rand) *GridMap {
 	grid := NewGrid()
-	terrain := make([]byte, MapW*MapH) // 默认 0 = 可通行
+	terrain := make([]byte, MapW*MapH)
+	for i := range terrain {
+		terrain[i] = '0' // 默认可通行，字符 '0'
+	}
 
 	// 山簇
 	const mountainClusters = 70
@@ -41,7 +45,44 @@ func GenerateMap(rng *rand.Rand) *GridMap {
 		genRiver(grid, terrain, rng)
 	}
 
+	// 保证阻挡地形至少占全图 1/3
+	ensureMinBlocked(grid, terrain, rng)
+
 	return &GridMap{Grid: grid, MapString: string(terrain)}
+}
+
+// ensureMinBlocked 保证阻挡地形至少占全图 1/3：不足则随机补小片山。
+func ensureMinBlocked(grid *Grid, terrain []byte, rng *rand.Rand) {
+	target := (MapW*MapH + 2) / 3 // 至少 1/3，向上取整
+	blocked := countBlocked(grid)
+	for blocked < target {
+		cx := rng.Intn(MapW)
+		cy := rng.Intn(MapH)
+		radius := 1 + rng.Intn(2) // 1..2 格的小块山
+		for y := cy - radius; y <= cy+radius; y++ {
+			for x := cx - radius; x <= cx+radius; x++ {
+				c := Vec2i{x, y}
+				if !grid.InBounds(c) {
+					continue
+				}
+				if grid.Walkable(c) {
+					setTerrain(grid, terrain, x, y, TerrainMountain)
+					blocked++
+				}
+			}
+		}
+	}
+}
+
+// countBlocked 统计当前阻挡格子数。
+func countBlocked(grid *Grid) int {
+	n := 0
+	for i := 0; i < MapW*MapH; i++ {
+		if !grid.walkable[i] {
+			n++
+		}
+	}
+	return n
 }
 
 // stampDisc 以 (cx,cy) 为中心、radius 为半径，把地形 stamp 进 grid 与 terrain，

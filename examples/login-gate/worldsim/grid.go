@@ -182,6 +182,98 @@ func AStar(grid *Grid, start, goal Vec2i) []Vec2i {
 	return nil
 }
 
+// Pathfinder 复用平铺数组执行带节点上限的 A*，避免每次寻路都分配 map。
+// 供 NPC 游走等高频寻路使用，单线程串行调用（world actor 驱动）。
+type Pathfinder struct {
+	gScore []int32
+	gGen   []int32
+	closed []int32
+	gen    int32
+	open   nodeHeap
+}
+
+func NewPathfinder() *Pathfinder {
+	return &Pathfinder{
+		gScore: make([]int32, MapW*MapH),
+		gGen:   make([]int32, MapW*MapH),
+		closed: make([]int32, MapW*MapH),
+	}
+}
+
+// Find 在 grid 上求 start 到 goal 的 8 方向路径；超过 maxExpand 个展开节点
+// 仍未到达时返回 nil（视为不可达），避免对“被河流/山隔断的目标”展开整个连通域。
+// 玩家 moveTo 仍走 AStar（不设上限）。
+func (pf *Pathfinder) Find(grid *Grid, start, goal Vec2i, maxExpand int) []Vec2i {
+	if !grid.Walkable(start) || !grid.Walkable(goal) {
+		return nil
+	}
+	if start == goal {
+		return []Vec2i{start}
+	}
+
+	pf.gen++
+	gen := pf.gen
+	pf.open = pf.open[:0]
+
+	si := start.Y*MapW + start.X
+	pf.gScore[si] = 0
+	pf.gGen[si] = gen
+	heap.Push(&pf.open, &astarNode{cell: start, g: 0, f: octile(start, goal)})
+
+	expanded := 0
+	for pf.open.Len() > 0 {
+		cur := heap.Pop(&pf.open).(*astarNode)
+		ci := cur.cell.Y*MapW + cur.cell.X
+		if pf.closed[ci] == gen {
+			continue
+		}
+		pf.closed[ci] = gen
+		expanded++
+		if expanded > maxExpand {
+			return nil
+		}
+
+		if cur.cell == goal {
+			return reconstruct(cur)
+		}
+
+		for i := 0; i < 8; i++ {
+			nx, ny := cur.cell.X+dx8[i], cur.cell.Y+dy8[i]
+			nc := Vec2i{nx, ny}
+			if !grid.Walkable(nc) {
+				continue
+			}
+			// 对角线不能穿墙角
+			if i >= 4 {
+				if !grid.Walkable(Vec2i{cur.cell.X + dx8[i], cur.cell.Y}) ||
+					!grid.Walkable(Vec2i{cur.cell.X, cur.cell.Y + dy8[i]}) {
+					continue
+				}
+			}
+			ni := ny*MapW + nx
+			if pf.closed[ni] == gen {
+				continue
+			}
+			step := 10
+			if i >= 4 {
+				step = 14
+			}
+			ng := cur.g + step*grid.CellCost(nc)
+			if pf.gGen[ni] != gen || ng < int(pf.gScore[ni]) {
+				pf.gGen[ni] = gen
+				pf.gScore[ni] = int32(ng)
+				heap.Push(&pf.open, &astarNode{
+					cell:   nc,
+					g:      ng,
+					f:      ng + octile(nc, goal),
+					parent: cur,
+				})
+			}
+		}
+	}
+	return nil
+}
+
 func reconstruct(n *astarNode) []Vec2i {
 	var path []Vec2i
 	for n != nil {

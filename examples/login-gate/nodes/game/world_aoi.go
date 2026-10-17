@@ -5,8 +5,8 @@ import "github.com/gulurence/cherry-server/examples/login-gate/worldsim"
 // aoiState 实现灯塔（lighthouse）兴趣管理：把对象按所在塔索引，把玩家按订阅
 // 的塔索引，用于视野内的进入/离开/移动事件扇出。
 //
-// 塔大小 50×50 格 -> 1000×1000 世界分成 20×20 个塔；玩家视野半径 25 格，
-// 实际覆盖到的塔至多 2×2 个。
+// 塔大小 50×50 格 -> 1000×1000 世界分成 20×20 个塔；玩家视野半径 50 格，
+// 即 100×100 的视野，实际覆盖到的塔至多 3×3 个。
 type aoiState struct {
 	towerW    int
 	towerH    int
@@ -22,7 +22,7 @@ type aoiState struct {
 
 func (a *aoiState) init() {
 	a.towerSize = 50
-	a.viewRange = 25
+	a.viewRange = 50
 	a.towerW = worldsim.MapW / a.towerSize // 20
 	a.towerH = worldsim.MapH / a.towerSize // 20
 

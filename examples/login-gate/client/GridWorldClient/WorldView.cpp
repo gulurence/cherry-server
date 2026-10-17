@@ -99,15 +99,21 @@ void CWorldView::OnPaint() {
     }
     memDC.SelectObject(oldPen);
 
-    // 3. 自己的路径（青蓝色折线）
-    if (!ownPath_.empty()) {
-        CPen pathPen(PS_SOLID, 2, RGB(0, 200, 220));
+    // 3. 每个对象的路径折线（青蓝色）+ 线上显示寻路耗时(ms)
+    for (const auto& kv : paths_) {
+        const auto& path = kv.second;
+        if (path.size() < 2) continue;
+        int costMs = 0;
+        auto cit = pathCostMs_.find(kv.first);
+        if (cit != pathCostMs_.end()) costMs = cit->second;
+
+        CPen pathPen(PS_SOLID, 1, RGB(0, 200, 220));
         CPen* oldPathPen = memDC.SelectObject(&pathPen);
+        int midX = 0, midY = 0;
         bool first = true;
-        int prevX = 0, prevY = 0;
-        for (const auto& cell : ownPath_) {
+        for (size_t i = 0; i < path.size(); ++i) {
             int sx, sy;
-            worldToScreen(cell.first, cell.second, sx, sy);
+            worldToScreen(path[i].first, path[i].second, sx, sy);
             int px = sx + cellSize_ / 2;
             int py = sy + cellSize_ / 2;
             if (first) {
@@ -116,52 +122,50 @@ void CWorldView::OnPaint() {
             } else {
                 memDC.LineTo(px, py);
             }
-            prevX = px;
-            prevY = py;
+            if (i == path.size() / 2) {
+                midX = px;
+                midY = py;
+            }
         }
-        (void)prevX;
-        (void)prevY;
         memDC.SelectObject(oldPathPen);
+
+        CString txt;
+        txt.Format(_T("%d ms"), costMs);
+        int oldBk = memDC.SetBkMode(TRANSPARENT);
+        COLORREF oldText = memDC.SetTextColor(RGB(255, 220, 0));
+        memDC.TextOut(midX, midY - 14, txt);
+        memDC.SetTextColor(oldText);
+        memDC.SetBkMode(oldBk);
     }
 
-    // 4. 对象
+    // 4. 对象（按尺寸 size 绘制 cellSize_*size 像素的方块，中心对齐所在格）
     for (const auto& kv : objs_) {
         const WorldObj& o = kv.second;
         int sx, sy;
         worldToScreen(o.cellX, o.cellY, sx, sy);
-        if (sx < -cellSize_ || sy < -cellSize_ || sx > rc.Width() || sy > rc.Height()) {
+
+        int objPx = cellSize_ * (o.size > 0 ? o.size : 1);
+        int left = sx + cellSize_ / 2 - objPx / 2;
+        int top = sy + cellSize_ / 2 - objPx / 2;
+        if (left + objPx < 0 || top + objPx < 0 || left > rc.Width() || top > rc.Height()) {
             continue;
         }
 
         COLORREF col = factionColor(o.faction);
-        int margin = (o.kind == 1) ? 2 : 3; // 玩家稍大
 
         // 黑方画白描边，避免看不清
         if (o.faction == 1) {
-            CBrush ring(RGB(255, 255, 255));
-            CBrush* oldBr = memDC.SelectObject(&ring);
-            CPen ringPen(PS_SOLID, 1, RGB(255, 255, 255));
-            CPen* oldP = memDC.SelectObject(&ringPen);
-            memDC.Ellipse(sx + margin - 1, sy + margin - 1,
-                          sx + cellSize_ - margin + 1, sy + cellSize_ - margin + 1);
-            memDC.SelectObject(oldP);
-            memDC.SelectObject(oldBr);
+            memDC.FillSolidRect(left - 1, top - 1, objPx + 2, objPx + 2, RGB(255, 255, 255));
         }
 
-        CBrush brush(col);
-        CBrush* oldBr = memDC.SelectObject(&brush);
-        CPen pen(PS_SOLID, 1, col);
-        CPen* oldP = memDC.SelectObject(&pen);
-        memDC.Ellipse(sx + margin, sy + margin, sx + cellSize_ - margin, sy + cellSize_ - margin);
-        memDC.SelectObject(oldP);
-        memDC.SelectObject(oldBr);
+        memDC.FillSolidRect(left, top, objPx, objPx, col);
 
-        // 自己：白色圆环高亮
+        // 自己：白色方框高亮
         if (o.id == selfId_) {
             CPen selfPen(PS_SOLID, 2, RGB(255, 255, 255));
             CPen* oldSP = memDC.SelectObject(&selfPen);
             CBrush* oldSB = static_cast<CBrush*>(memDC.SelectStockObject(NULL_BRUSH));
-            memDC.Ellipse(sx + 1, sy + 1, sx + cellSize_ - 1, sy + cellSize_ - 1);
+            memDC.Rectangle(left - 2, top - 2, left + objPx + 2, top + objPx + 2);
             memDC.SelectObject(oldSP);
             memDC.SelectObject(oldSB);
         }

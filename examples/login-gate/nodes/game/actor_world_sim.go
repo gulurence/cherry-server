@@ -13,7 +13,7 @@ import (
 
 const (
 	tickInterval   = 50 * time.Millisecond
-	npcCount       = 30
+	npcPerFaction  = 200
 	playerIdleWait = 60 * time.Second
 )
 
@@ -70,6 +70,10 @@ type ActorWorldSim struct {
 
 	aoi      aoiState
 	lastTick time.Time
+
+	// 碰撞统计：按阵营关系聚合，避免 3000 个 NPC 时逐条日志刷屏。
+	collStats   map[worldsim.Relation]int
+	lastCollLog time.Time
 }
 
 // AliasID 是顶层 actor 的注册 id，最终路径为 "<gameNodeID>.worldsim"。
@@ -84,12 +88,15 @@ func (p *ActorWorldSim) OnInit() {
 	p.mapStr = gm.MapString
 	p.sim = worldsim.NewGame(gm.Grid, p.rng)
 	p.sim.OnCollision = p.onCollision
+	p.sim.OnPathChanged = p.onPathChanged
 
 	p.players = make(map[int64]*playerEntry)
 	p.objOwner = make(map[int]int64)
 	p.aoi.init()
 	p.nextObjID = 1
 	p.lastTick = time.Now()
+	p.collStats = make(map[worldsim.Relation]int)
+	p.lastCollLog = p.lastTick
 
 	p.spawnNPCs()
 
@@ -104,18 +111,24 @@ func (p *ActorWorldSim) OnInit() {
 // ---- 世界初始化 ----
 
 func (p *ActorWorldSim) spawnNPCs() {
-	for i := 0; i < npcCount; i++ {
-		cell := p.randomWalkable()
-		o := &worldsim.Object{
-			ID:       p.nextObjID,
-			Faction:  worldsim.Faction(p.rng.Intn(3)),
-			IsPlayer: false,
-			Pos:      worldsim.Vec2{X: float32(cell.X) + 0.5, Y: float32(cell.Y) + 0.5},
+	// 红 / 黑 / 中立（绿）各 200 个，共 600 个 NPC。
+	for f := worldsim.FactionRed; f <= worldsim.FactionGreen; f++ {
+		for i := 0; i < npcPerFaction; i++ {
+			cell := p.randomWalkable()
+			size := 1 + p.rng.Intn(3) // 随机 1x1 / 2x2 / 3x3
+			o := &worldsim.Object{
+				ID:       p.nextObjID,
+				Faction:  f,
+				IsPlayer: false,
+				Size:     size,
+				Radius:   worldsim.RadiusForSize(size),
+				Pos:      worldsim.Vec2{X: float32(cell.X) + 0.5, Y: float32(cell.Y) + 0.5},
+			}
+			p.nextObjID++
+			p.sim.AddObject(o)
+			p.aoi.addObject(o.ID, cell.X, cell.Y)
+			p.sim.AssignRandomTarget(o)
 		}
-		p.nextObjID++
-		p.sim.AddObject(o)
-		p.aoi.addObject(o.ID, cell.X, cell.Y)
-		p.sim.AssignRandomTarget(o)
 	}
 }
 
@@ -156,6 +169,9 @@ func (p *ActorWorldSim) enter(req *simEnterArg) (*msg.EnterResponse, int32) {
 		Faction:  faction,
 		IsPlayer: true,
 		Uid:      uid,
+		Size:     1,
+		Radius:   worldsim.RadiusForSize(1),
+		Speed:    worldsim.PlayerMoveSpeed,
 		Pos:      worldsim.Vec2{X: float32(cell.X) + 0.5, Y: float32(cell.Y) + 0.5},
 	}
 	p.sim.AddObject(o)
@@ -214,7 +230,7 @@ func (p *ActorWorldSim) moveTo(req *simMoveToArg) (*msg.MoveToResponse, int32) {
 	for _, c := range path {
 		cells = append(cells, msg.Cell{X: int32(c.X), Y: int32(c.Y)})
 	}
-	return &msg.MoveToResponse{Code: code.OK, Path: cells}, code.OK
+	return &msg.MoveToResponse{Code: code.OK, CostMs: int32(o.PathCostMs), Path: cells}, code.OK
 }
 
 func (p *ActorWorldSim) view(req *simViewArg) int32 {
@@ -272,8 +288,9 @@ func (p *ActorWorldSim) tick() {
 	}
 
 	p.sim.Update(dt)
-	p.sim.WanderNPCs()
+	p.sim.WanderNPCs(now)
 	p.syncAOI()
+	p.reportCollisions(now)
 	p.sweepIdle(now)
 }
 
@@ -329,14 +346,49 @@ func (p *ActorWorldSim) removePlayer(uid int64) {
 // ---- 碰撞回调 ----
 
 func (p *ActorWorldSim) onCollision(a, b *worldsim.Object, rel worldsim.Relation) {
-	word := "good"
-	switch rel {
-	case worldsim.RelFriendly:
-		word = "hello"
-	case worldsim.RelEnemy:
-		word = "battle"
+	p.collStats[rel]++
+}
+
+// onPathChanged 在对象获得新路径时，向当前塔内订阅玩家广播路点 + 寻路耗时。
+func (p *ActorWorldSim) onPathChanged(o *worldsim.Object) {
+	t, ok := p.aoi.objTower[o.ID]
+	if !ok {
+		return
 	}
-	clog.Infof("[world] collision=%s objA=%d(faction=%d) objB=%d(faction=%d)", word, a.ID, a.Faction, b.ID, b.Faction)
+	uids := p.towerUids(t, 0)
+	if len(uids) == 0 {
+		return
+	}
+	p.pushToUIDs("game.world.objPath", p.buildObjPath(o), uids)
+}
+
+// buildObjPath 将对象剩余路径转成协议结构（含寻路耗时）。
+func (p *ActorWorldSim) buildObjPath(o *worldsim.Object) *msg.ObjPathPush {
+	cells := make([]msg.Cell, 0, len(o.Path))
+	for _, c := range o.Path[o.PathIdx:] {
+		cells = append(cells, msg.Cell{X: int32(c.X), Y: int32(c.Y)})
+	}
+	return &msg.ObjPathPush{
+		ID:     int64(o.ID),
+		CostMs: int32(o.PathCostMs),
+		Path:   cells,
+	}
+}
+
+// reportCollisions 每秒汇总一次碰撞统计，避免逐条刷屏。
+func (p *ActorWorldSim) reportCollisions(now time.Time) {
+	if now.Sub(p.lastCollLog) < time.Second {
+		return
+	}
+	p.lastCollLog = now
+	if len(p.collStats) == 0 {
+		return
+	}
+	clog.Infof("[world] collisions(1s): battle=%d hello=%d good=%d",
+		p.collStats[worldsim.RelEnemy],
+		p.collStats[worldsim.RelFriendly],
+		p.collStats[worldsim.RelNeutral])
+	p.collStats = make(map[worldsim.Relation]int)
 }
 
 // ---- 工具 ----
@@ -366,6 +418,7 @@ func (p *ActorWorldSim) buildWorldObject(o *worldsim.Object) *msg.WorldObject {
 		ID:      int64(o.ID),
 		Kind:    kind,
 		Faction: int32(o.Faction),
+		Size:    int32(o.Size),
 		X:       o.Pos.X,
 		Y:       o.Pos.Y,
 		CellX:   int32(o.Cell.X),
@@ -386,7 +439,7 @@ func (p *ActorWorldSim) buildObjMove(o *worldsim.Object) *msg.ObjMovePush {
 // snapshotInTowers 返回这些塔内所有对象（去重，排除某个对象）的协议快照。
 func (p *ActorWorldSim) snapshotInTowers(towers []int, exclude int) []msg.WorldObject {
 	seen := make(map[int]struct{})
-	var out []msg.WorldObject
+	out := make([]msg.WorldObject, 0)
 	for _, t := range towers {
 		for id := range p.aoi.towerObjs[t] {
 			if id == exclude {

@@ -51,6 +51,7 @@ type WorldObject struct {
 	ID      int64   `json:"id"`
 	Kind    int32   `json:"kind"`    // 0=NPC, 1=玩家
 	Faction int32   `json:"faction"` // 0红 1黑 2绿
+	Size    int32   `json:"size"`    // 尺寸（格）：1/2/3
 	X       float32 `json:"x"`
 	Y       float32 `json:"y"`
 	CellX   int32   `json:"cell_x"`
@@ -78,10 +79,11 @@ type MoveToRequest struct {
 	Y int32 `json:"y"`
 }
 
-// MoveToResponse 移动请求响应（含 A* 路径）。
+// MoveToResponse 移动请求响应（含 A* 路径与寻路耗时）。
 type MoveToResponse struct {
-	Code int32  `json:"code"` // 0 成功
-	Path []Cell `json:"path"`
+	Code   int32  `json:"code"`     // 0 成功
+	CostMs int32  `json:"cost_ms"`  // 寻路耗时（毫秒）
+	Path   []Cell `json:"path"`
 }
 
 // ViewRequest 上报视野中心（客户端当前显示中心）。
@@ -107,4 +109,11 @@ type ObjMovePush struct {
 // ObjLeavePush 对象离开视野推送。
 type ObjLeavePush struct {
 	ID int64 `json:"id"`
+}
+
+// ObjPathPush 对象寻路结果推送：路点线条 + 寻路耗时（毫秒）。
+type ObjPathPush struct {
+	ID     int64  `json:"id"`
+	CostMs int32  `json:"cost_ms"`
+	Path   []Cell `json:"path"`
 }

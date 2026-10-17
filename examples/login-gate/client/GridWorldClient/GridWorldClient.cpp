@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "GridWorldClient.h"
+#include "LoginDlg.h"
 #include "MainDlg.h"
 
 #ifdef _DEBUG
@@ -24,11 +25,18 @@ BOOL CGridWorldClientApp::InitInstance() {
     InitCtrls.dwICC = ICC_WIN95_CLASSES;
     InitCommonControlsEx(&InitCtrls);
 
-    CMainDlg dlg;
+    // 先弹登录窗口，登录并进入世界成功后才打开主窗口。
+    CLoginDlg loginDlg;
+    if (loginDlg.DoModal() != IDOK) {
+        return FALSE; // 取消登录，直接退出
+    }
+
+    // 移交连接与进入数据，打开世界主窗口。
+    CMainDlg dlg(loginDlg.TakeClient(), loginDlg.TakeEnterInfo());
     m_pMainWnd = &dlg;
     dlg.DoModal();
 
-    // DoModal 返回后应用退出（对话框关闭即结束）。
+    // 主窗口关闭即退出应用。
     return FALSE;
 }
 

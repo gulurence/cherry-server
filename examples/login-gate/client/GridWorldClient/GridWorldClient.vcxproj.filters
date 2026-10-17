@@ -17,6 +17,7 @@
   <ItemGroup>
     <ClCompile Include="GridWorldClient.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="Json.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="LoginDlg.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="MainDlg.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="PomeloClient.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="WorldView.cpp"><Filter>源文件</Filter></ClCompile>
@@ -25,6 +26,7 @@
   <ItemGroup>
     <ClInclude Include="GridWorldClient.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="Json.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="LoginDlg.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="MainDlg.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="PomeloClient.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="WorldView.h"><Filter>头文件</Filter></ClInclude>

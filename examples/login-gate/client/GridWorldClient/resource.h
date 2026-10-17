@@ -2,6 +2,7 @@
 
 // 对话框
 #define IDD_MAIN_DIALOG 102
+#define IDD_LOGIN_DIALOG 103
 
 // 控件 ID
 #define IDC_ACCOUNT      1001
