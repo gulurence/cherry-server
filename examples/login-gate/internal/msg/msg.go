@@ -63,20 +63,25 @@ type EnterRequest struct {
 	Faction int32 `json:"faction"`
 }
 
-// EnterResponse 进入世界响应：地图 + 出生点 + 初始可见对象快照。
+// EnterResponse 进入世界响应：地图 + 出生点 + 初始可见对象快照 + 动态城堡快照。
 type EnterResponse struct {
-	Map     string        `json:"map"`     // 1,000,000 个字符 '0'/'1'/'2'
+	Map     string        `json:"map"`     // 地形快照的 RLE+base64（worldsim.EncodeGridBase64），解码后为 1,000,000 字符 '0'/'1'/'2'
 	SelfID  int64         `json:"self_id"` // 自己的对象 id
 	SpawnX  int32         `json:"spawn_x"`
 	SpawnY  int32         `json:"spawn_y"`
 	Faction int32         `json:"faction"`
 	Objects []WorldObject `json:"objects"`
+	Castles string        `json:"castles"` // 城堡快照的 RLE+base64，解码后为 1,000,000 字符 '0'/'1'，'1' 为城堡阻挡格
 }
 
 // MoveToRequest 移动到目标格子。
+//
+// Path 是客户端本地预寻路得到的路点（可选）。服务器会对它做校验/修正，
+// 不合法时回退到服务器全量 A*。缺省时服务器直接全量 A*。
 type MoveToRequest struct {
-	X int32 `json:"x"`
-	Y int32 `json:"y"`
+	X    int32  `json:"x"`
+	Y    int32  `json:"y"`
+	Path []Cell `json:"path"`
 }
 
 // MoveToResponse 移动请求响应（含 A* 路径与寻路耗时）。
@@ -116,4 +121,17 @@ type ObjPathPush struct {
 	ID     int64  `json:"id"`
 	CostMs int32  `json:"cost_ms"`
 	Path   []Cell `json:"path"`
+}
+
+// CastleCellsPush 动态城堡格子增删推送（route: game.world.castleAdd / castleRemove）。
+type CastleCellsPush struct {
+	Cells []Cell `json:"cells"`
+}
+
+// CastleTowerPush 灯塔视野切换时，某个塔的完整城堡格子快照（route: game.world.castleTower）。
+// 客户端据此清空该塔区域内的城堡标记，再按 Cells 重新标记，避免因视野外增删漏收
+// 导致的新旧城堡残留。
+type CastleTowerPush struct {
+	Tower int32  `json:"tower"` // 塔编号 = ty*towerW + tx（towerW=20，towerSize=50）
+	Cells []Cell `json:"cells"` // 该塔内当前的城堡格子
 }

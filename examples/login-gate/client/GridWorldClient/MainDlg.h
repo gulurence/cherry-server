@@ -10,6 +10,16 @@
 #include "PomeloClient.h"
 #include "WorldView.h"
 
+#define WM_APP_PATH (WM_APP + 4) // wParam=0, lParam=(PathResult*)，后台本地寻路完成
+
+// 后台线程本地 A* 的结果，通过 WM_APP_PATH 投递回 UI 线程。
+struct PathResult {
+    int tx = 0;
+    int ty = 0;
+    int costMs = 0; // 客户端本地寻路耗时(ms)
+    std::vector<std::pair<int, int>> path; // 完整路点；空表示不可达
+};
+
 // CMainDlg：登录成功后的主窗口，只承载世界视图。
 //
 // 连接与进入数据由 CLoginDlg 移交（见构造函数）。此后本窗口负责
@@ -27,6 +37,7 @@ protected:
     afx_msg LRESULT OnResponse(WPARAM w, LPARAM l);
     afx_msg LRESULT OnPush(WPARAM w, LPARAM l);
     afx_msg LRESULT OnClosed(WPARAM w, LPARAM l);
+    afx_msg LRESULT OnPathReady(WPARAM w, LPARAM l);
     DECLARE_MESSAGE_MAP()
 
 private:
@@ -42,4 +53,5 @@ private:
     CWorldView world_;
     std::map<uint32_t, std::function<void(bool, const std::string&)>> pending_;
     int64_t selfId_ = 0;
+    int selfPathCostMs_ = 0; // 最近一次本地寻路耗时(ms)，用于覆盖服务器返回的 cost_ms
 };

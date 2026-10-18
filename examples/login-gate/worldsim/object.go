@@ -9,14 +9,12 @@ import (
 type ObjState int
 
 const (
-	StateMoving  ObjState = iota // 沿路径移动
-	StateBlocked                 // 被敌对对象阻挡
+	StateMoving ObjState = iota // 沿路径移动
 )
 
 const (
 	MoveSpeed         = 2.0               // NPC 移动速度（格/秒），已减慢一倍
 	PlayerMoveSpeed   = 4.0               // 玩家移动速度（格/秒），比 NPC 快两倍
-	BlockTimeout      = 5 * time.Second   // 敌人相遇后，等待 5 秒再强制重新寻路移动
 	CollisionCooldown = 200 * time.Millisecond
 	MaxRadius         = 1.5 // 最大对象半径（尺寸 3 对应 1.5），作为空间查询的扩展半径
 	WanderCooldown    = time.Second // NPC 空闲后重新挑目标的最小间隔，避免大量 NPC 同时 A*
@@ -48,8 +46,7 @@ type Object struct {
 	PathIdx int
 	State   ObjState
 
-	BlockSince    time.Time
-	RequestRepath bool
+	RepathPending bool // 已入队重寻路、结果尚未回填（去重：避免每帧重复提交）
 	Target        Vec2i
 	PathCostMs    int64     // 最近一次寻路耗时（毫秒）
 	WanderAt      time.Time // 下次允许随机挑新目标的时刻（节流 NPC 重寻路）

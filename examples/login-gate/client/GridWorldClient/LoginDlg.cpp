@@ -25,6 +25,73 @@ WorldObj ParseWorldObject(const json::Value& v) {
     return o;
 }
 
+// 服务端把 1,000,000 字符的地形/城堡快照做行程编码（RLE）后 base64 下发。这里还原成
+// 等长字符网格串（'0'/'1'/'2' 或 '0'/'1'），格式与 worldsim/rle.go 严格对应。
+
+int Base64Value(unsigned char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+// Base64Decode 标准 alphabet 解码，容忍末尾 '=' 填充。非法输入返回 false。
+bool Base64Decode(const std::string& in, std::string& out) {
+    out.clear();
+    out.reserve(in.size() * 3 / 4 + 4);
+    uint64_t buf = 0;
+    int nbits = 0;
+    for (unsigned char c : in) {
+        if (c == '=') break;
+        int v = Base64Value(c);
+        if (v < 0) return false;
+        buf = (buf << 6) | static_cast<uint64_t>(v);
+        nbits += 6;
+        if (nbits >= 8) {
+            nbits -= 8;
+            out.push_back(static_cast<char>((buf >> nbits) & 0xFF));
+        }
+    }
+    return true;
+}
+
+// ReadUvarint 读取一个 LEB128 无符号变长整数，返回值和消耗字节数（截断时返回 0）。
+uint64_t ReadUvarint(const std::string& b, size_t& pos) {
+    uint64_t v = 0;
+    int shift = 0;
+    for (; pos < b.size(); ++pos) {
+        uint8_t c = static_cast<uint8_t>(b[pos]);
+        v |= static_cast<uint64_t>(c & 0x7F) << shift;
+        if (!(c & 0x80)) {
+            ++pos;
+            return v;
+        }
+        shift += 7;
+    }
+    return 0;
+}
+
+// DecodeGridString 解码 RLE+base64 网格串，还原成 expect 个字符。失败返回空串。
+std::string DecodeGridString(const std::string& b64, size_t expect) {
+    std::string raw;
+    if (!Base64Decode(b64, raw)) return std::string();
+    size_t pos = 0;
+    uint64_t total = ReadUvarint(raw, pos);
+    if (total != expect) return std::string();
+    std::string out;
+    out.reserve(expect);
+    while (out.size() < expect) {
+        if (pos >= raw.size()) return std::string();
+        char val = raw[pos++];
+        uint64_t run = ReadUvarint(raw, pos);
+        if (run == 0 || run > expect - out.size()) return std::string();
+        out.append(static_cast<size_t>(run), val);
+    }
+    return out;
+}
+
 } // namespace
 
 CLoginDlg::CLoginDlg(CWnd* pParent) : CDialogEx(IDD_LOGIN_DIALOG, pParent) {}
@@ -136,7 +203,14 @@ void CLoginDlg::handleEnterResp(bool err, const std::string& json) {
         return;
     }
 
-    info_.map = mapv->asString();
+    info_.map = DecodeGridString(mapv->asString(),
+                                 static_cast<size_t>(CWorldView::MapW) * CWorldView::MapH);
+    if (info_.map.empty()) {
+        resetConnection();
+        GetDlgItem(IDC_CONNECT)->EnableWindow(TRUE);
+        setStatus(_T("enter 响应地图解码失败"));
+        return;
+    }
     info_.selfId = self->asInt64();
     info_.spawnX = spx->asInt();
     info_.spawnY = spy->asInt();
@@ -147,6 +221,11 @@ void CLoginDlg::handleEnterResp(bool err, const std::string& json) {
                 info_.objects.push_back(ParseWorldObject((*objs)[i]));
             }
         }
+    }
+
+    if (const auto* cs = v.find("castles")) {
+        info_.castles = DecodeGridString(cs->asString(),
+                                         static_cast<size_t>(CWorldView::MapW) * CWorldView::MapH);
     }
 
     success_ = true;

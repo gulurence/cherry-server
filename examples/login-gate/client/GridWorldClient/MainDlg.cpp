@@ -3,6 +3,8 @@
 #include "Json.h"
 #include "resource.h"
 
+#include <chrono>
+
 namespace {
 
 WorldObj ParseWorldObject(const json::Value& v) {
@@ -31,6 +33,7 @@ BEGIN_MESSAGE_MAP(CMainDlg, CDialogEx)
     ON_MESSAGE(WM_APP_RESPONSE, &CMainDlg::OnResponse)
     ON_MESSAGE(WM_APP_PUSH, &CMainDlg::OnPush)
     ON_MESSAGE(WM_APP_CLOSED, &CMainDlg::OnClosed)
+    ON_MESSAGE(WM_APP_PATH, &CMainDlg::OnPathReady)
 END_MESSAGE_MAP()
 
 BOOL CMainDlg::OnInitDialog() {
@@ -58,6 +61,7 @@ BOOL CMainDlg::OnInitDialog() {
     client_->SetNotifyWnd(m_hWnd);
     world_.SetMap(info_.map);
     world_.SetSelf(info_.selfId, info_.spawnX, info_.spawnY, info_.faction);
+    world_.SetCastles(info_.castles);
     for (const auto& o : info_.objects) {
         world_.OnEnterObject(o);
     }
@@ -92,8 +96,11 @@ void CMainDlg::sendRequest(const std::string& route, const std::string& body,
 void CMainDlg::handleMoveToResp(bool err, const std::string& json) {
     if (err) return;
     json::Value v = json::parse(json);
-    int costMs = 0;
-    if (const auto* c = v.find("cost_ms")) costMs = c->asInt();
+    // 客户端本地已预寻路，显示用本地耗时；服务端返回的 cost_ms 只是校验耗时（≈0）。
+    int costMs = selfPathCostMs_;
+    if (costMs <= 0) {
+        if (const auto* c = v.find("cost_ms")) costMs = c->asInt();
+    }
     std::vector<std::pair<int, int>> path;
     if (const auto* p = v.find("path")) {
         if (p->isArray()) {
@@ -109,9 +116,56 @@ void CMainDlg::handleMoveToResp(bool err, const std::string& json) {
 }
 
 void CMainDlg::onMoveTo(int x, int y) {
-    std::string body = "{\"x\":" + std::to_string(x) + ",\"y\":" + std::to_string(y) + "}";
+    // 目标不可通行则本地直接忽略（不发请求）。
+    const std::string& map = world_.GetMap();
+    if (!map.empty()) {
+        if (x < 0 || y < 0 || x >= CWorldView::MapW || y >= CWorldView::MapH) return;
+        if (map[(size_t)y * CWorldView::MapW + x] != '0') return;
+    }
+
+    auto self = world_.GetSelfCell();
+    int sx = self.first, sy = self.second;
+    std::string mapCopy = map;
+    HWND hwnd = m_hWnd;
+
+    // 后台线程本地 A*（避免卡 UI），完成后经 WM_APP_PATH 回投 UI 线程。
+    std::thread([hwnd, mapCopy, sx, sy, x, y]() {
+        auto t0 = std::chrono::steady_clock::now();
+        auto path = CWorldView::FindPath(mapCopy, sx, sy, x, y);
+        auto costMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          std::chrono::steady_clock::now() - t0)
+                          .count();
+        auto* res = new PathResult;
+        res->tx = x;
+        res->ty = y;
+        res->costMs = static_cast<int>(costMs);
+        res->path = std::move(path);
+        ::PostMessage(hwnd, WM_APP_PATH, 0, reinterpret_cast<LPARAM>(res));
+    }).detach();
+}
+
+LRESULT CMainDlg::OnPathReady(WPARAM, LPARAM l) {
+    std::unique_ptr<PathResult> res(reinterpret_cast<PathResult*>(l));
+    if (!res) return 0;
+
+    selfPathCostMs_ = res->costMs;
+
+    std::string body = "{\"x\":" + std::to_string(res->tx) +
+                       ",\"y\":" + std::to_string(res->ty);
+    if (!res->path.empty()) {
+        body += ",\"path\":[";
+        for (size_t i = 0; i < res->path.size(); ++i) {
+            if (i) body += ",";
+            body += "{\"x\":" + std::to_string(res->path[i].first) +
+                    ",\"y\":" + std::to_string(res->path[i].second) + "}";
+        }
+        body += "]";
+    }
+    body += "}";
+
     sendRequest("game.world.moveTo", body,
                 [this](bool err, const std::string& json) { handleMoveToResp(err, json); });
+    return 0;
 }
 
 void CMainDlg::onView(int cx, int cy) {
@@ -168,6 +222,37 @@ LRESULT CMainDlg::OnPush(WPARAM, LPARAM l) {
             }
         }
         world_.OnObjPath(id, costMs, path);
+    } else if (p->route == "game.world.castleAdd" || p->route == "game.world.castleRemove") {
+        json::Value v = json::parse(p->json);
+        std::vector<std::pair<int, int>> cells;
+        if (const auto* cs = v.find("cells")) {
+            if (cs->isArray()) {
+                for (size_t i = 0; i < cs->size(); ++i) {
+                    int x = 0, y = 0;
+                    if (const auto* px = (*cs)[i].find("x")) x = px->asInt();
+                    if (const auto* py = (*cs)[i].find("y")) y = py->asInt();
+                    cells.emplace_back(x, y);
+                }
+            }
+        }
+        if (p->route == "game.world.castleAdd") world_.OnCastleAdd(cells);
+        else world_.OnCastleRemove(cells);
+    } else if (p->route == "game.world.castleTower") {
+        json::Value v = json::parse(p->json);
+        int tower = 0;
+        std::vector<std::pair<int, int>> cells;
+        if (const auto* tv = v.find("tower")) tower = tv->asInt();
+        if (const auto* cs = v.find("cells")) {
+            if (cs->isArray()) {
+                for (size_t i = 0; i < cs->size(); ++i) {
+                    int x = 0, y = 0;
+                    if (const auto* px = (*cs)[i].find("x")) x = px->asInt();
+                    if (const auto* py = (*cs)[i].find("y")) y = py->asInt();
+                    cells.emplace_back(x, y);
+                }
+            }
+        }
+        world_.OnCastleTower(tower, cells);
     }
     delete p;
     return 0;

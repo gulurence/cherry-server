@@ -15,8 +15,11 @@
 //   5. 生命周期：AliasID() -> OnInit()（生成地图、注册远程函数、注入回调、启动 tick）
 //   6. 世界初始化：spawnNPCs()（红/黑/绿各 200 个，随机尺寸 1~3）、randomWalkable()
 //   7. 远程函数（被 ActorWorld 调用）：enter / moveTo / view / leave
-//   8. 每帧模拟：tick() -> sim.Update + WanderNPCs + syncAOI + reportCollisions + sweepIdle
-//      syncAOI()（对象换格/换塔扇出事件）、sweepIdle()（清理超时玩家）、removePlayer()
+//   8. 每帧模拟：tick() -> UpdateCastles(动态城堡增删) + sim.Update + WanderNPCs + syncAOI
+//      + reportCollisions + sweepIdle；syncAOI()（对象换格/换塔扇出事件）、
+//      sweepIdle()（清理超时玩家）、removePlayer()
+//  11a. 动态城堡：castleMapString（进入快照） / castleCellsMsg / broadcastCastleCells（增删按灯塔扇出）
+//      / castleCellsByTower（视野切换时补发塔内城堡快照）
 //   9. 碰撞回调：onCollision()（统计阵营关系）、reportCollisions()（每秒汇总一次日志）
 //  10. 寻路回调：onPathChanged() / buildObjPath()（广播剩余路点 + 寻路耗时，供客户端画线）
 //  11. 工具函数：clampCell / buildWorldObject / buildObjMove / snapshotInTowers /
@@ -25,6 +28,8 @@ package game
 
 import (
 	"math/rand"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/gulurence/cherry-server/examples/login-gate/internal/code"
@@ -37,8 +42,12 @@ import (
 const (
 	tickInterval   = 50 * time.Millisecond
 	npcPerFaction  = 200
-	playerIdleWait = 60 * time.Second
+	playerIdleWait = 300 * time.Second
 )
+
+// pathWorkerCount 是玩家 moveTo 全图寻路的 worker 池大小（每 worker 独立 ~16MB scratch）。
+// 实测（8 物理核 / 16 逻辑核）：16 worker 优于 8 worker（wall p50 3.9s vs 4.5s），取满逻辑核。
+var pathWorkerCount = 16
 
 // 以下是与 ActorWorld 通信的 RPC 参数。它们只在同一 game 节点内以 Go 对象形式
 // 传递，不经过线上序列化，但保留 json tag 以便未来可跨节点调用。
@@ -49,9 +58,13 @@ type simEnterArg struct {
 }
 
 type simMoveToArg struct {
-	Uid int64 `json:"uid"`
-	X   int32 `json:"x"`
-	Y   int32 `json:"y"`
+	Uid       int64      `json:"uid"`
+	AgentPath string     `json:"agent_path"` // 会话三字段，供 worldsim 直接延迟响应（绕过 ActorWorld）
+	Sid       string     `json:"sid"`
+	Mid       uint32     `json:"mid"`
+	X         int32      `json:"x"`
+	Y         int32      `json:"y"`
+	Path      []msg.Cell `json:"path"` // 客户端预寻路路点（可选）
 }
 
 type simViewArg struct {
@@ -64,6 +77,16 @@ type simLeaveArg struct {
 	Uid int64 `json:"uid"`
 }
 
+// pendingMove 记录一次已入队、等待 worker 结果的玩家 moveTo，用于结果回填与延迟响应。
+type pendingMove struct {
+	uid       int64
+	seq       int // 玩家当前 moveTo 序号，用于丢弃被更新请求取代的过期结果
+	goal      worldsim.Vec2i
+	agentPath string
+	sid       string
+	mid       uint32
+}
+
 // playerEntry 记录一个已进入世界的玩家的会话与对象关联。
 type playerEntry struct {
 	Uid       int64
@@ -73,6 +96,7 @@ type playerEntry struct {
 	ViewX     int
 	ViewY     int
 	LastSeen  time.Time
+	pathSeq   int // 该玩家已提交的 moveTo 序号（用于丢弃过期寻路结果）
 }
 
 // ActorWorldSim 是 game 节点上独立的世界模拟 actor(actorID = "worldsim")。
@@ -84,12 +108,17 @@ type ActorWorldSim struct {
 	pomelo.ActorBase
 
 	sim       *worldsim.Game
-	mapStr    string
+	mapEnc    string // 地形快照的 RLE+base64（进入世界时下发，静态、启动时编码一次）
+	castleEnc string // 城堡阻挡快照的 RLE+base64，随城堡增删重建
 	rng       *rand.Rand
 	nextObjID int
 
 	players  map[int64]*playerEntry
 	objOwner map[int]int64 // objID -> uid（NPC 为 0）
+
+	// 异步寻路：token -> 已入队待回填的 moveTo 请求（结果由 drainPathResults 回填）。
+	pendingMove   map[int64]pendingMove
+	nextMoveToken int64
 
 	aoi      aoiState
 	lastTick time.Time
@@ -106,15 +135,23 @@ func (p *ActorWorldSim) AliasID() string {
 
 // OnInit 生成世界、注册远程函数并启动世界模拟。
 func (p *ActorWorldSim) OnInit() {
-	p.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	// 地图种子：默认用时间随机；设置 LG_MAP_SEED 环境变量可固定地图，便于压测前后对比。
+	seed := time.Now().UnixNano()
+	if v := os.Getenv("LG_MAP_SEED"); v != "" {
+		if s, err := strconv.ParseInt(v, 10, 64); err == nil {
+			seed = s
+		}
+	}
+	p.rng = rand.New(rand.NewSource(seed))
 	gm := worldsim.GenerateMap(p.rng)
-	p.mapStr = gm.MapString
-	p.sim = worldsim.NewGame(gm.Grid, p.rng)
+	p.mapEnc = worldsim.EncodeGridBase64(gm.MapString)
+	p.sim = worldsim.NewGame(gm.Grid, p.rng, pathWorkerCount)
 	p.sim.OnCollision = p.onCollision
 	p.sim.OnPathChanged = p.onPathChanged
 
 	p.players = make(map[int64]*playerEntry)
 	p.objOwner = make(map[int]int64)
+	p.pendingMove = make(map[int64]pendingMove)
 	p.aoi.init()
 	p.nextObjID = 1
 	p.lastTick = time.Now()
@@ -122,6 +159,10 @@ func (p *ActorWorldSim) OnInit() {
 	p.lastCollLog = p.lastTick
 
 	p.spawnNPCs()
+
+	// 预置动态城堡，使其初始即覆盖全图 1/8，之后由 tick 里的 UpdateCastles 每 5 秒增删。
+	p.sim.SeedCastles()
+	p.castleEnc = p.castleMapEncoded()
 
 	p.Remote().Register("enter", p.enter)
 	p.Remote().Register("moveTo", p.moveTo)
@@ -219,41 +260,131 @@ func (p *ActorWorldSim) enter(req *simEnterArg) (*msg.EnterResponse, int32) {
 	snapshot := p.snapshotInTowers(towers, objID)
 
 	return &msg.EnterResponse{
-		Map:     p.mapStr,
+		Map:     p.mapEnc,
 		SelfID:  int64(objID),
 		SpawnX:  int32(cell.X),
 		SpawnY:  int32(cell.Y),
 		Faction: int32(faction),
 		Objects: snapshot,
+		Castles: p.castleEnc,
 	}, code.OK
 }
 
 func (p *ActorWorldSim) moveTo(req *simMoveToArg) (*msg.MoveToResponse, int32) {
 	e, ok := p.players[req.Uid]
 	if !ok {
-		return nil, code.NotEntered
+		p.respondMove(req.AgentPath, req.Sid, req.Mid, code.NotEntered, 0, nil)
+		return nil, code.OK
 	}
 	o := p.sim.Object(e.ObjID)
 	if o == nil {
-		return nil, code.NotEntered
+		p.respondMove(req.AgentPath, req.Sid, req.Mid, code.NotEntered, 0, nil)
+		return nil, code.OK
 	}
 
 	target := worldsim.Vec2i{X: int(req.X), Y: int(req.Y)}
 	if !p.sim.Grid().Walkable(target) {
-		return nil, code.TargetBlocked
-	}
-
-	path := p.sim.SetPath(o, target)
-	if path == nil {
-		return nil, code.TargetBlocked
+		p.respondMove(req.AgentPath, req.Sid, req.Mid, code.TargetBlocked, 0, nil)
+		return nil, code.OK
 	}
 
 	e.LastSeen = time.Now()
+
+	// 客户端预寻路：保持同步 SetClientPath + 立即响应（不走 worker 池，本期不改）。
+	if len(req.Path) > 0 {
+		clientPath := make([]worldsim.Vec2i, len(req.Path))
+		for i, c := range req.Path {
+			clientPath[i] = worldsim.Vec2i{X: int(c.X), Y: int(c.Y)}
+		}
+		path := p.sim.SetClientPath(o, target, clientPath)
+		if path == nil {
+			p.respondMove(req.AgentPath, req.Sid, req.Mid, code.TargetBlocked, 0, nil)
+			return nil, code.OK
+		}
+		p.respondMove(req.AgentPath, req.Sid, req.Mid, code.OK, o.PathCostMs, path)
+		return nil, code.OK
+	}
+
+	// 服务器全量寻路：异步入队到 worker 池，结果由 tick 里的 drainPathResults 回填并响应。
+	e.pathSeq++
+	token := p.nextMoveToken
+	p.nextMoveToken++
+	p.pendingMove[token] = pendingMove{
+		uid:       req.Uid,
+		seq:       e.pathSeq,
+		goal:      target,
+		agentPath: req.AgentPath,
+		sid:       req.Sid,
+		mid:       req.Mid,
+	}
+	p.sim.SubmitPath(worldsim.PathJob{Token: token, Start: o.Cell, Goal: target, MaxExpand: 0})
+	return nil, code.OK
+}
+
+// respondMove 把 moveTo 结果直接回给客户端（绕过 ActorWorld 的 CallWait）。
+func (p *ActorWorldSim) respondMove(agentPath, sid string, mid uint32, errCode int32, costMs int64, path []worldsim.Vec2i) {
+	if errCode != code.OK {
+		pomelo.ResponseCode(p, agentPath, sid, mid, errCode)
+		return
+	}
 	cells := make([]msg.Cell, 0, len(path))
 	for _, c := range path {
 		cells = append(cells, msg.Cell{X: int32(c.X), Y: int32(c.Y)})
 	}
-	return &msg.MoveToResponse{Code: code.OK, CostMs: int32(o.PathCostMs), Path: cells}, code.OK
+	pomelo.Response(p, agentPath, sid, mid, &msg.MoveToResponse{Code: code.OK, CostMs: int32(costMs), Path: cells})
+}
+
+// drainPathResults 把已就绪的异步寻路结果回填到对象并响应。由 tick 每帧调用。
+func (p *ActorWorldSim) drainPathResults() {
+	p.sim.PathPool().Drain(func(r worldsim.PathResult) {
+		if r.Kind == worldsim.PathRepath {
+			p.sim.ApplyRepathResult(r)
+			return
+		}
+		pm, ok := p.pendingMove[r.Token]
+		if !ok {
+			return
+		}
+		delete(p.pendingMove, r.Token)
+
+		e, ok := p.players[pm.uid]
+		if !ok {
+			return // 玩家已离开
+		}
+		if e.pathSeq != pm.seq {
+			return // 已被更新的 moveTo 取代
+		}
+		o := p.sim.Object(e.ObjID)
+		if o == nil {
+			return
+		}
+
+		if r.Path == nil {
+			p.respondMove(pm.agentPath, pm.sid, pm.mid, code.TargetBlocked, 0, nil)
+			return
+		}
+
+		path := worldsim.RebasePath(o.Cell, r.Path)
+		if path == nil {
+			// 对象在寻路期间已移动超过 1 格：以当前格重新入队重算。
+			e.pathSeq++
+			token := p.nextMoveToken
+			p.nextMoveToken++
+			p.pendingMove[token] = pendingMove{pm.uid, e.pathSeq, pm.goal, pm.agentPath, pm.sid, pm.mid}
+			p.sim.SubmitPath(worldsim.PathJob{Token: token, Start: o.Cell, Goal: pm.goal, MaxExpand: 0})
+			return
+		}
+
+		o.Path = path
+		o.PathIdx = 0
+		o.Target = pm.goal
+		o.State = worldsim.StateMoving
+		o.PathCostMs = r.CostMs
+		if p.sim.OnPathChanged != nil {
+			p.sim.OnPathChanged(o)
+		}
+		p.respondMove(pm.agentPath, pm.sid, pm.mid, code.OK, r.CostMs, path)
+	})
 }
 
 func (p *ActorWorldSim) view(req *simViewArg) int32 {
@@ -289,6 +420,16 @@ func (p *ActorWorldSim) view(req *simViewArg) int32 {
 		}
 	}
 
+	// 新增塔：补发塔内当前城堡快照（灯塔视野切换时的城堡同步）。
+	if len(added) > 0 {
+		byTower := p.castleCellsByTower(added)
+		for _, t := range added {
+			p.pushToUIDs("game.world.castleTower",
+				&msg.CastleTowerPush{Tower: int32(t), Cells: p.castleCellsMsg(byTower[t])},
+				[]int64{e.Uid})
+		}
+	}
+
 	return code.OK
 }
 
@@ -310,7 +451,15 @@ func (p *ActorWorldSim) tick() {
 		dt = 0.25
 	}
 
+	// 动态城堡先增删，再跑模拟：Update 会因城堡挡住路径而为对象重新寻路。
+	if added, removed := p.sim.UpdateCastles(now); len(added) > 0 || len(removed) > 0 {
+		p.broadcastCastleCells("game.world.castleAdd", added)
+		p.broadcastCastleCells("game.world.castleRemove", removed)
+		p.castleEnc = p.castleMapEncoded()
+	}
+
 	p.sim.Update(dt)
+	p.drainPathResults()
 	p.sim.WanderNPCs(now)
 	p.syncAOI()
 	p.reportCollisions(now)
@@ -490,6 +639,72 @@ func (p *ActorWorldSim) towerUids(t int, exceptUid int64) []int64 {
 		uids = append(uids, uid)
 	}
 	return uids
+}
+
+// castleMapString 把当前城堡阻挡格渲染成 1,000,000 字符的 '0'/'1' 串，'1' 表示城堡格。
+// 客户端进入世界时一次性绘制；后续增删走 castleAdd / castleRemove 推送增量更新。
+func (p *ActorWorldSim) castleMapString() string {
+	b := make([]byte, worldsim.MapW*worldsim.MapH)
+	for i := range b {
+		b[i] = '0'
+	}
+	for _, c := range p.sim.AllCastleCells() {
+		b[c.Y*worldsim.MapW+c.X] = '1'
+	}
+	return string(b)
+}
+
+// castleMapEncoded 返回城堡阻挡快照的 RLE+base64 下发形式（8×8 实心块，压缩率约 12×）。
+func (p *ActorWorldSim) castleMapEncoded() string {
+	return worldsim.EncodeGridBase64(p.castleMapString())
+}
+
+// castleCellsMsg 把一组城堡格子转成协议结构。
+func (p *ActorWorldSim) castleCellsMsg(cells []worldsim.Vec2i) []msg.Cell {
+	out := make([]msg.Cell, 0, len(cells))
+	for _, c := range cells {
+		out = append(out, msg.Cell{X: int32(c.X), Y: int32(c.Y)})
+	}
+	return out
+}
+
+// castleCellsByTower 返回这些塔各自的当前城堡格子（tower -> cells）。用于视野切换时
+// 给玩家补发每个新增塔的完整城堡快照，客户端据此清空并重设该塔，避免因视野外
+// 增删漏收导致的新旧城堡残留。
+func (p *ActorWorldSim) castleCellsByTower(towers []int) map[int][]worldsim.Vec2i {
+	out := make(map[int][]worldsim.Vec2i, len(towers))
+	if len(towers) == 0 {
+		return out
+	}
+	set := make(map[int]struct{}, len(towers))
+	for _, t := range towers {
+		set[t] = struct{}{}
+		out[t] = nil
+	}
+	for _, c := range p.sim.AllCastleCells() {
+		t := p.aoi.towerKey(c.X, c.Y)
+		if _, ok := set[t]; ok {
+			out[t] = append(out[t], c)
+		}
+	}
+	return out
+}
+
+// broadcastCastleCells 用灯塔（AOI）把城堡格子增删推送给“视野覆盖到这些格子”的玩家，
+// 而非广播给所有在线玩家。做法：先把格子按塔分组，每座塔只把塔内的格子推给订阅该塔
+// 的玩家，保证每名玩家只收到自己视野内的城堡变化（严格灯塔扇出）。
+func (p *ActorWorldSim) broadcastCastleCells(route string, cells []worldsim.Vec2i) {
+	if len(cells) == 0 {
+		return
+	}
+	byTower := make(map[int][]worldsim.Vec2i)
+	for _, c := range cells {
+		t := p.aoi.towerKey(c.X, c.Y)
+		byTower[t] = append(byTower[t], c)
+	}
+	for t, towerCells := range byTower {
+		p.pushToUIDs(route, &msg.CastleCellsPush{Cells: p.castleCellsMsg(towerCells)}, p.towerUids(t, 0))
+	}
 }
 
 // pushToUIDs 按玩家所在网关（AgentPath）分组，向一批 uid 广播推送。

@@ -18,6 +18,7 @@ struct EnterInfo {
     int spawnY = 0;
     int faction = 0;
     std::vector<WorldObj> objects; // 初始可见对象快照
+    std::string castles;           // 1,000,000 个字符 '0'/'1'（仅绘制，本地寻路只看静态地图）
 };
 
 // CLoginDlg：独立的登录窗口，负责连接 + 登录 + 进入世界。

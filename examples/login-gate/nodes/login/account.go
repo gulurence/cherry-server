@@ -1,6 +1,7 @@
 package login
 
 import (
+	"fmt"
 	"sync"
 
 	ccrypto "github.com/gulurence/cherry-server/extend/crypto"
@@ -29,6 +30,11 @@ func newAccountStore() *accountStore {
 
 	s.Register("admin", "admin123")
 	s.Register("test", "123456")
+
+	// 压测用：预置 1000 个账号 stress0..stress999，避免同一账号重复登录互相顶号。
+	for i := 0; i < 1000; i++ {
+		s.Register(fmt.Sprintf("stress%d", i), "123456")
+	}
 
 	return s
 }

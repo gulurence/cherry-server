@@ -51,9 +51,9 @@ func GenerateMap(rng *rand.Rand) *GridMap {
 	return &GridMap{Grid: grid, MapString: string(terrain)}
 }
 
-// ensureMinBlocked 保证阻挡地形至少占全图 1/3：不足则随机补小片山。
+// ensureMinBlocked 保证阻挡地形至少占全图 1/4：不足则随机补小片山。
 func ensureMinBlocked(grid *Grid, terrain []byte, rng *rand.Rand) {
-	target := (MapW*MapH + 2) / 3 // 至少 1/3，向上取整
+	target := MapW * MapH / 4 // 至少 1/4
 	blocked := countBlocked(grid)
 	for blocked < target {
 		cx := rng.Intn(MapW)

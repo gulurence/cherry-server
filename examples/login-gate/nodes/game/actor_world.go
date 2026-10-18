@@ -73,17 +73,17 @@ func (p *ActorWorld) enter(session *cproto.Session, req *msg.EnterRequest) {
 }
 
 func (p *ActorWorld) moveTo(session *cproto.Session, req *msg.MoveToRequest) {
-	rsp := &msg.MoveToResponse{}
-	errCode := p.CallWait(p.worldSimPath(), "moveTo", &simMoveToArg{
-		Uid: session.Uid,
-		X:   req.X,
-		Y:   req.Y,
-	}, rsp)
-	if code.IsFail(errCode) {
-		p.ResponseCode(session, errCode)
-		return
-	}
-	p.Response(session, rsp)
+	// 异步转发：worldsim 校验后把全图 A* 交给 worker 池，结果由 worldsim 直接回给客户端
+	// （Response 与 Call 解耦）。这里用 fire-and-forget 的 Call，不再 CallWait 阻塞，也不在此响应。
+	p.Call(p.worldSimPath(), "moveTo", &simMoveToArg{
+		Uid:       session.Uid,
+		AgentPath: session.AgentPath,
+		Sid:       session.Sid,
+		Mid:       session.Mid,
+		X:         req.X,
+		Y:         req.Y,
+		Path:      req.Path,
+	})
 }
 
 func (p *ActorWorld) view(session *cproto.Session, req *msg.ViewRequest) {
